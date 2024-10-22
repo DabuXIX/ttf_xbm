@@ -85,6 +85,8 @@ def convert_ttf_to_xbm(ttf_path, char_list, forced_width=None, forced_height=Non
 
         # Apply the transformation matrix with the zero delta vector
         face.set_transform(matrix, delta)
+    else:
+        print("No scaling applied. Rendering glyph with natural width and height.")
 
     for char in char_list:
         print(f"\nConverting character: {char}")
