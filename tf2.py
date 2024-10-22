@@ -4,21 +4,21 @@ import os
 # Converts a freetype bitmap into XBM format with fixed width and height.
 def simple_to_xbm(char, bitmap, max_width, height):
     xbm_data = []
-    
-    # For each row of the bitmap
-    for row in range(height):
+
+    # For each row in the bitmap (limited by the height and actual bitmap rows)
+    for row in range(min(height, bitmap.rows)):
         byte = 0
         bit_count = 0
 
-        # For each column in the row (up to max_width)
+        # For each column in the row (up to max_width or actual bitmap width)
         for col in range(min(max_width, bitmap.width)):
-            # Check if the pixel in bitmap is non-zero (1 = on, 0 = off)
+            # Check if pixel in the bitmap is non-zero
             if bitmap.buffer[row * bitmap.pitch + col]:
                 byte |= (1 << bit_count)  # Set the corresponding bit if the pixel is on
 
             bit_count += 1
 
-            # If we have accumulated 8 bits, we pack it into the byte
+            # If we have accumulated 8 bits, pack it into the byte
             if bit_count == 8:
                 xbm_data.append(byte)
                 byte = 0  # Reset the byte accumulator
@@ -28,8 +28,8 @@ def simple_to_xbm(char, bitmap, max_width, height):
         if bit_count > 0:
             xbm_data.append(byte)  # Add the final byte even if it has less than 8 bits
 
-    # Padding rows to a fixed height if necessary
-    while len(xbm_data) < height * ((max_width + 7) // 8):
+    # Padding rows to a fixed height if necessary (if height > bitmap.rows)
+    while len(xbm_data) < height * ((max_width + 7) // 8):  # Ensure rows are padded to full height
         xbm_data.append(0)
 
     return xbm_data
