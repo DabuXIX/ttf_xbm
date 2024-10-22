@@ -1,5 +1,36 @@
 import freetype
 import os
+from PIL import Image
+
+# Function to widen a glyph by stretching its pixel data horizontally
+def widen_glyph(bitmap, forced_width):
+    original_width = bitmap.width
+    new_buffer = []
+
+    # Calculate the scaling factor for the width
+    scale_factor = forced_width / original_width
+
+    # Iterate over each row of the bitmap
+    for row in range(bitmap.rows):
+        new_row = []
+        
+        # Iterate over each pixel in the row
+        for col in range(original_width):
+            # Copy each pixel multiple times based on the scale factor
+            pixel_value = bitmap.buffer[row * bitmap.pitch + col]
+            stretch_count = int(scale_factor)
+            
+            # Stretch the pixel horizontally
+            for _ in range(stretch_count):
+                new_row.append(pixel_value)
+        
+        # If there's still room left to fill in the forced_width, fill with white pixels (0)
+        while len(new_row) < forced_width:
+            new_row.append(0)
+        
+        new_buffer.extend(new_row)
+
+    return bytes(new_buffer)
 
 # Converts a FreeType bitmap into XBM format with fixed width and height.
 def bitmap_to_xbm(char, bitmap, forced_width, height):
@@ -71,23 +102,6 @@ def convert_ttf_to_xbm(ttf_path, char_list, forced_width=None, forced_height=Non
     face = freetype.Face(ttf_path)
     face.set_pixel_sizes(0, height)  # Set the height, and FreeType calculates width based on this
 
-    # Check if forced_width or forced_height are provided before using x_scale and y_scale
-    if forced_width is not None or forced_height is not None:
-        # Calculate the scaling factor for both width and height
-        x_scale = forced_width / face.size.x_ppem if forced_width else 1.0
-        y_scale = forced_height / face.size.y_ppem if forced_height else 1.0
-        
-        # Set up the transformation matrix with scaling for both x and y axes
-        matrix = freetype.Matrix(int(x_scale * 0x10000), 0, 0, int(y_scale * 0x10000))
-
-        # Create a zero vector for the delta argument (no translation in x or y directions)
-        delta = freetype.Vector(0, 0)
-
-        # Apply the transformation matrix with the zero delta vector
-        face.set_transform(matrix, delta)
-    else:
-        print("No scaling applied. Rendering glyph with natural width and height.")
-
     for char in char_list:
         print(f"\nConverting character: {char}")
         
@@ -109,6 +123,12 @@ def convert_ttf_to_xbm(ttf_path, char_list, forced_width=None, forced_height=Non
             print(f"Actual glyph width: {bitmap.width}, Adjusted to: {actual_width}")
             print(f"Actual glyph height: {bitmap.rows}, Adjusted to: {actual_height}")
 
+            # Widen the glyph horizontally if forced_width is greater than original width
+            if forced_width and forced_width > bitmap.width:
+                widened_bitmap_data = widen_glyph(bitmap, forced_width)
+                bitmap.buffer = widened_bitmap_data  # Update the buffer with widened data
+                bitmap.width = forced_width  # Update width to the forced width
+
             # Convert bitmap to XBM format with fixed width and actual height
             xbm_data = bitmap_to_xbm(char, bitmap, actual_width, actual_height)
 
@@ -123,7 +143,7 @@ if __name__ == "__main__":
     ttf_path = r"C:\Users\theda\OneDrive\Desktop\ttf_testuing\Courier.ttf"
 
     # Characters to convert
-    char_list = "J"
+    char_list = "Jw"
 
     # Convert characters to XBM with forced width (e.g., 14 pixels wide) and forced height (e.g., 20 pixels tall)
     convert_ttf_to_xbm(ttf_path, char_list, forced_width=14, forced_height=20)
