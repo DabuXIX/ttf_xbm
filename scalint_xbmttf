@@ -2,8 +2,6 @@ import freetype
 import os
 
 # Converts a FreeType bitmap into XBM format with fixed width and height.
-# Centers the character within the forced width by adding padding on the left and right.
-# Scales the glyph horizontally and vertically to fit the forced width and height.
 def bitmap_to_xbm(char, bitmap, forced_width, height):
     xbm_data = []
     
