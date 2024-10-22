@@ -70,23 +70,28 @@ def convert_ttf_to_xbm(ttf_path, char_list, forced_width=None, forced_height=Non
     print(f"Loading font from: {ttf_path}")
     face = freetype.Face(ttf_path)
     face.set_pixel_sizes(0, height)  # Set the height, and FreeType calculates width based on this
-    
+
+    # Check if forced_width or forced_height are provided before using x_scale and y_scale
+    if forced_width is not None or forced_height is not None:
+        # Calculate the scaling factor for both width and height
+        x_scale = forced_width / face.size.x_ppem if forced_width else 1.0
+        y_scale = forced_height / face.size.y_ppem if forced_height else 1.0
+        
+        # Set up the transformation matrix with scaling for both x and y axes
+        matrix = freetype.Matrix(int(x_scale * 0x10000), 0, 0, int(y_scale * 0x10000))
+
+        # Create a zero vector for the delta argument (no translation in x or y directions)
+        delta = freetype.Vector(0, 0)
+
+        # Apply the transformation matrix with the zero delta vector
+        face.set_transform(matrix, delta)
+
     for char in char_list:
         print(f"\nConverting character: {char}")
         
-        # Apply horizontal and vertical scaling transformation to stretch the glyph to the forced width and height
-        if forced_width is not None or forced_height is not None:
-            # Calculate the scaling factor for both width and height
-            x_scale = forced_width / face.size.metrics.x_ppem if forced_width else 1.0
-            y_scale = forced_height / face.size.metrics.y_ppem if forced_height else 1.0
-            
-            # Set up the transformation matrix with scaling for both x and y axes
-            matrix = freetype.Matrix(int(x_scale * 0x10000), 0, 0, int(y_scale * 0x10000))
-            face.set_transform(matrix, None)  # Apply the transformation matrix
-
         # Load the character glyph with auto-hinting enabled to improve low-resolution rendering
         try:
-            face.load_char(char, freetype.FT_LOAD_RENDER | freetype.FT_LOAD_FORCE_AUTOHINT)  # Enable auto-hinting and rendering
+            face.load_char(char, freetype.FT_LOAD_RENDER | freetype.FT_LOAD_FORCE_AUTOHINT)
             
             bitmap = face.glyph.bitmap
 
