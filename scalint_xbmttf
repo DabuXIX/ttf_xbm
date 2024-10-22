@@ -30,39 +30,39 @@ def widen_glyph(bitmap, forced_width):
         
         new_buffer.extend(new_row)
 
-    return bytes(new_buffer)
+    # Create a new PIL Image with the widened glyph data
+    new_image = Image.new("L", (forced_width, bitmap.rows))
+    new_image.putdata(new_buffer)
+    
+    return new_image
 
 # Converts a FreeType bitmap into XBM format with fixed width and height.
-def bitmap_to_xbm(char, bitmap, forced_width, height):
+def bitmap_to_xbm(char, image, forced_width, height):
     xbm_data = []
     
     # Each byte will contain 8 bits, so calculate the number of bytes per row
     bytes_per_row = (forced_width + 7) // 8  # Ceiling division to account for full byte
 
     print(f"Processing character: {char}")
-    print(f"Bitmap dimensions: {bitmap.width}x{bitmap.rows} (width x height)")
+    print(f"Bitmap dimensions: {image.width}x{image.height} (width x height)")
     print(f"Forced width: {forced_width}, Target height: {height}, Bytes per row: {bytes_per_row}")
 
-    if bitmap.buffer is None:
-        print(f"Error: Bitmap buffer is null for character '{char}'. Skipping...")
-        return xbm_data
-
     # Calculate padding to center the glyph within the forced width
-    left_padding = (forced_width - bitmap.width) // 2
-    right_padding = forced_width - bitmap.width - left_padding
+    left_padding = (forced_width - image.width) // 2
+    right_padding = forced_width - image.width - left_padding
 
     print(f"Left padding: {left_padding} pixels, Right padding: {right_padding} pixels")
 
-    for row in range(min(height, bitmap.rows)):  # Limit to specified height
+    for row in range(min(height, image.height)):  # Limit to specified height
         row_data = [0] * bytes_per_row  # Initialize row with zeros (padding if needed)
         
         # Shift the character to the center by adding left padding
-        for col in range(bitmap.width):  # Only loop over the actual character width
+        for col in range(image.width):  # Only loop over the actual character width
             byte_index = (col + left_padding) // 8  # Shift by left_padding
             bit_index = (col + left_padding) % 8    # Determine which bit in the byte to set
 
-            # Set bit if pixel in bitmap is non-zero
-            if bitmap.buffer[row * bitmap.pitch + col] > 0:
+            # Set bit if pixel in image is non-zero
+            if image.getpixel((col, row)) > 0:
                 row_data[byte_index] |= (1 << bit_index)
         
         xbm_data.extend(row_data)
@@ -125,12 +125,14 @@ def convert_ttf_to_xbm(ttf_path, char_list, forced_width=None, forced_height=Non
 
             # Widen the glyph horizontally if forced_width is greater than original width
             if forced_width and forced_width > bitmap.width:
-                widened_bitmap_data = widen_glyph(bitmap, forced_width)
-                bitmap.buffer = widened_bitmap_data  # Update the buffer with widened data
-                bitmap.width = forced_width  # Update width to the forced width
+                widened_image = widen_glyph(bitmap, forced_width)
+
+            else:
+                # If no resizing is necessary, convert the bitmap directly into an image
+                widened_image = Image.frombytes('L', (bitmap.width, bitmap.rows), bitmap.buffer, 'raw', 'L', bitmap.pitch)
 
             # Convert bitmap to XBM format with fixed width and actual height
-            xbm_data = bitmap_to_xbm(char, bitmap, actual_width, actual_height)
+            xbm_data = bitmap_to_xbm(char, widened_image, actual_width, actual_height)
 
             # Write the XBM data to a file with the actual height
             write_xbm_file(char, xbm_data, actual_width, actual_height)
