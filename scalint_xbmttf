@@ -1,0 +1,124 @@
+import freetype
+import os
+
+# Converts a FreeType bitmap into XBM format with fixed width and height.
+# Centers the character within the forced width by adding padding on the left and right.
+# Scales the glyph horizontally and vertically to fit the forced width and height.
+def bitmap_to_xbm(char, bitmap, forced_width, height):
+    xbm_data = []
+    
+    # Each byte will contain 8 bits, so calculate the number of bytes per row
+    bytes_per_row = (forced_width + 7) // 8  # Ceiling division to account for full byte
+
+    print(f"Processing character: {char}")
+    print(f"Bitmap dimensions: {bitmap.width}x{bitmap.rows} (width x height)")
+    print(f"Forced width: {forced_width}, Target height: {height}, Bytes per row: {bytes_per_row}")
+
+    if bitmap.buffer is None:
+        print(f"Error: Bitmap buffer is null for character '{char}'. Skipping...")
+        return xbm_data
+
+    # Calculate padding to center the glyph within the forced width
+    left_padding = (forced_width - bitmap.width) // 2
+    right_padding = forced_width - bitmap.width - left_padding
+
+    print(f"Left padding: {left_padding} pixels, Right padding: {right_padding} pixels")
+
+    for row in range(min(height, bitmap.rows)):  # Limit to specified height
+        row_data = [0] * bytes_per_row  # Initialize row with zeros (padding if needed)
+        
+        # Shift the character to the center by adding left padding
+        for col in range(bitmap.width):  # Only loop over the actual character width
+            byte_index = (col + left_padding) // 8  # Shift by left_padding
+            bit_index = (col + left_padding) % 8    # Determine which bit in the byte to set
+
+            # Set bit if pixel in bitmap is non-zero
+            if bitmap.buffer[row * bitmap.pitch + col] > 0:
+                row_data[byte_index] |= (1 << bit_index)
+        
+        xbm_data.extend(row_data)
+        print(f"Row {row}: {row_data}")  # Print row data for debugging
+
+    # Pad remaining rows to maintain fixed height
+    while len(xbm_data) < bytes_per_row * height:
+        xbm_data.append(0)
+
+    return xbm_data
+
+# Writes XBM data to a file in XBM format.
+def write_xbm_file(char, xbm_data, width, height, output_dir=r"C:\Users\theda\OneDrive\Desktop\ttf_testuing\output"):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    file_name = os.path.join(output_dir, f"{char}.xbm")
+    with open(file_name, "w") as f:
+        f.write(f"#define {char}_width {width}\n")
+        f.write(f"#define {char}_height {height}\n")  # Write the actual height
+        f.write(f"static char {char}_bits[] = {{\n")
+
+        # Write bytes in XBM format with max 12 bytes per line for readability
+        for i, byte in enumerate(xbm_data):
+            f.write(f"0x{byte:02x}")
+            if i < len(xbm_data) - 1:
+                f.write(", ")
+            if (i + 1) % 12 == 0:  # Limit line length to 12 bytes for readability
+                f.write("\n")
+        f.write("\n};\n")
+
+    print(f"XBM file for '{char}' saved as {file_name}.")
+
+# Converts TTF characters to XBM format with specified width and height.
+def convert_ttf_to_xbm(ttf_path, char_list, forced_width=None, forced_height=None, height=13):
+    print(f"Loading font from: {ttf_path}")
+    face = freetype.Face(ttf_path)
+    face.set_pixel_sizes(0, height)  # Set the height, and FreeType calculates width based on this
+    
+    for char in char_list:
+        print(f"\nConverting character: {char}")
+        
+        # Apply horizontal and vertical scaling transformation to stretch the glyph to the forced width and height
+        if forced_width is not None or forced_height is not None:
+            # Calculate the scaling factor for both width and height
+            x_scale = forced_width / face.size.metrics.x_ppem if forced_width else 1.0
+            y_scale = forced_height / face.size.metrics.y_ppem if forced_height else 1.0
+            
+            # Set up the transformation matrix with scaling for both x and y axes
+            matrix = freetype.Matrix(int(x_scale * 0x10000), 0, 0, int(y_scale * 0x10000))
+            face.set_transform(matrix, None)  # Apply the transformation matrix
+
+        # Load the character glyph with auto-hinting enabled to improve low-resolution rendering
+        try:
+            face.load_char(char, freetype.FT_LOAD_RENDER | freetype.FT_LOAD_FORCE_AUTOHINT)  # Enable auto-hinting and rendering
+            
+            bitmap = face.glyph.bitmap
+
+            # Check if bitmap is valid and has data
+            if bitmap.buffer is None or bitmap.width == 0 or bitmap.rows == 0:
+                print(f"Skipping character '{char}' as it does not contain valid bitmap data.")
+                continue
+
+            # If forced_width is provided, override the natural glyph width
+            actual_width = forced_width if forced_width else bitmap.width
+            actual_height = forced_height if forced_height else bitmap.rows  # Get the actual or forced height
+
+            print(f"Actual glyph width: {bitmap.width}, Adjusted to: {actual_width}")
+            print(f"Actual glyph height: {bitmap.rows}, Adjusted to: {actual_height}")
+
+            # Convert bitmap to XBM format with fixed width and actual height
+            xbm_data = bitmap_to_xbm(char, bitmap, actual_width, actual_height)
+
+            # Write the XBM data to a file with the actual height
+            write_xbm_file(char, xbm_data, actual_width, actual_height)
+        
+        except Exception as e:
+            print(f"Error processing character '{char}': {e}")
+
+if __name__ == "__main__":
+    # Path to the TTF font file
+    ttf_path = r"C:\Users\theda\OneDrive\Desktop\ttf_testuing\Courier.ttf"
+
+    # Characters to convert
+    char_list = "J"
+
+    # Convert characters to XBM with forced width (e.g., 14 pixels wide) and forced height (e.g., 20 pixels tall)
+    convert_ttf_to_xbm(ttf_path, char_list, forced_width=14, forced_height=20)
