@@ -11,8 +11,8 @@ def bitmap_to_xbm(char, bitmap, forced_width, forced_height):
     # Create a PIL image from the bitmap array
     img = Image.fromarray(bitmap_array)
 
-    # Resize the image to the forced width and height using anti-aliasing
-    img_resized = img.resize((forced_width, forced_height), Image.ANTIALIAS)
+    # Resize the image to the forced width and height using high-quality resampling (LANCZOS)
+    img_resized = img.resize((forced_width, forced_height), Image.Resampling.LANCZOS)
 
     # Convert the resized image back to a numpy array
     resized_array = np.array(img_resized)
